@@ -53,7 +53,10 @@ class Material {
 public:
 	bool is_mirror = false;
 	bool is_transparent = false;
+	bool is_light = false;
+
 	double refractive_index = 1.4;
+	double light_intensity = 0;
 
 	// White as default color
 	Vector albedo = Vector(1., 1. ,1.); 
@@ -64,6 +67,10 @@ public:
 	void set_is_mirror(bool is_mirror) {this->is_mirror = is_mirror;}
 	void set_is_transparent(bool is_transparent) {this->is_transparent = is_transparent;}
 	void set_refractive_index(double refractive_index) {this->refractive_index = refractive_index;}
+	void set_light(double light_intensity) {
+		is_light = (light_intensity == 0.);
+		this->light_intensity = light_intensity;
+	}
 
 	bool operator==(const Material& other) {
 		return (
@@ -118,6 +125,14 @@ public:
 
 	const Vector& albedo() const {
 		return material.albedo;
+	}
+
+	bool is_light() const {
+		return material.is_light;
+	}
+
+	double light_intensity() const {
+		return material.light_intensity;
 	}
 
 	void intersect(const Ray& r, HitInfo& hit_info) const {
@@ -177,19 +192,23 @@ public:
 	}
 
 
-	double compute_visibility(const Vector& P, const Vector& N) const{
+	double compute_visibility(const Vector& P, const Vector& N, const Vector& x) const {
 		// Returns the visibility at point P with normal N.
 
 		HitInfo hit_info;
 
 		// Make ray to the light source
-		Vector light_vector = L - P;
+		Vector light_vector = x - P;
 		Ray ray_to_source(P + EPSILON*N, light_vector.normalized());
 
 		intersect(ray_to_source, hit_info);
 		if (hit_info.is_hit && light_vector.norm2() > (hit_info.P - P).norm2())
 			return 0.;
 		return 1.;
+	}
+
+	double compute_visibility(const Vector& P, const Vector& N) const{
+		return compute_visibility(P, N, L);
 	}
 
 	Vector directLighting(const HitInfo& hit_info) {
@@ -207,6 +226,40 @@ public:
 			(hit_info.material.albedo/M_PI) * 
 			visibility *
 			std::max(0.0, cosine_similarity(hit_info.N, omega_i))
+		);
+
+		return Lo;
+	}
+
+	Vector directLighting(const HitInfo& hit_info, const Sphere& light_sphere) {
+		// Sample point on the light sphere
+		const Vector& C = light_sphere.C;
+		double R = light_sphere.R;
+
+		Vector D = (hit_info.P - C).normalized();
+		Vector V = random_cos(D);
+		Vector x_sphere = C + R * V;
+
+		Vector Lo(0., 0., 0.);
+		if (compute_visibility(hit_info.P, hit_info.N, x_sphere) == 0.) 
+			return Lo;
+		
+		Vector omega_i = (x_sphere - hit_info.P).normalized();
+		Vector N_sphere = (x_sphere - C).normalized();
+
+		double form_factor = (
+			std::max(0., dot(-omega_i, hit_info.N)) *
+			std::max(0., dot(omega_i, N_sphere)) /
+			(x_sphere - hit_info.P).norm2()
+		);
+
+		double pdf = std::max(0., dot(N_sphere, D))/(M_PI*R*R);
+
+		Lo = (
+			(light_sphere.albedo()/M_PI) *
+			(light_sphere.light_intensity()/(4*M_PI*M_PI*R*R)) *
+			form_factor /
+			pdf
 		);
 
 		return Lo;
