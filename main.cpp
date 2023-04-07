@@ -49,34 +49,65 @@ public:
 	Vector u;
 };
 
+class Material {
+public:
+	bool is_mirror = false;
+	bool is_transparent = false;
+	double refractive_index = 1.4;
+
+	// White as default color
+	Vector albedo = Vector(1., 1. ,1.); 
+
+	Material() = default;
+	Material(const Vector& albedo) : albedo(albedo){}
+
+	void set_is_mirror(bool is_mirror) {this->is_mirror = is_mirror;}
+	void set_is_transparent(bool is_transparent) {this->is_transparent = is_transparent;}
+	void set_refractive_index(double refractive_index) {this->refractive_index = refractive_index;}
+};
 
 class Sphere {
 public:
 	// ...
-	Sphere(const Vector& C, double R, const Vector& rho, bool is_mirror = false, bool is_transparent = false) : C(C), R(R), rho(rho), is_mirror(is_mirror), is_transparent(is_transparent) {};
+	Sphere(const Material& m, const Vector& C, double R) {
+		this->C = C;
+		this->R = R;
+		material = m;
+	}	
+	
 	Vector C;
 	double R;
-	Vector rho;
-	bool is_mirror, is_transparent;
-	bool intersect(const Ray& r, Vector& P, Vector& N, double& t) const {
 
+	Material material;
+
+	// Getters
+	bool is_mirror() const {
+		return material.is_mirror;
+	}
+
+	bool is_transparent() const {
+		return material.is_transparent;
+	}
+
+	const Vector& albedo() const {
+		return material.albedo;
+	}
+
+	bool intersect(const Ray& r, Vector& P, Vector& N, double& t) const {
 		double delta = sqr(dot(r.u, r.O - C)) - dot(r.O - C, r.O - C) + R * R;
 		if (delta >= 0) {
-			double t1 = dot(r.u, C - r.O) - sqrt(delta);
 			double t2 = dot(r.u, C - r.O) + sqrt(delta);
 			if (t2 < 0) return false;
-			if (t1 > 0) {
-				t = t1;
-			}
-			else {
-				t = t2;
-			}
+			
+			double t1 = dot(r.u, C - r.O) - sqrt(delta);
+			t = (t1 > 0) ? t1 : t2;
+
 			P = r.O + t * r.u;
 			N = P - C;
 			N = N.normalized();
+			
 			return true;
 		}
-
 		return false;
 	}
 
@@ -158,7 +189,7 @@ public:
 
 		Lo = (
 			(I/(4*M_PI*omega_i.norm2())) *
-			(objects[sphere_id].rho/M_PI) * 
+			(objects[sphere_id].albedo()/M_PI) * 
 			visibility *
 			std::max(0.0, cosine_similarity(N, omega_i))
 		);
@@ -170,7 +201,7 @@ public:
 		if (ray_depth < 0) return Vector(0,0,0);
 
 		Ray random_ray = Ray(P + EPSILON*N, random_cos(N));
-		return objects[sphere_id].rho * getColor(random_ray, ray_depth-1);
+		return objects[sphere_id].albedo() * getColor(random_ray, ray_depth-1);
 	}
 
 	Vector getColor(const Ray& ray, int ray_depth){
@@ -185,13 +216,13 @@ public:
 		}
 
 		// Intersection happens
-		if (objects[sphere_id].is_mirror) {
+		if (objects[sphere_id].is_mirror()) {
 			Vector mirror_direction = ray.u - 2 * dot(ray.u, N) * N;
 				Ray mirror_ray = Ray(P + EPSILON * N, mirror_direction);
 				return getColor(mirror_ray, ray_depth - 1);
 		}
 
-		if (objects[sphere_id].is_transparent) {
+		if (objects[sphere_id].is_transparent()) {
 				double n1 = 1;
 				double n2 = 1.4;
 				double n = n1 / n2;
@@ -288,15 +319,14 @@ int main() {
 	int W = 512;
 	int H = 512;
 
-	Sphere s1(Vector(0, 7, 5), 7, Vector(1., 0.5, 1.), false, true);
-	Sphere s2(Vector(0, 7, 5), 6, Vector(1., 0.5, 1), true, false);
+	Sphere s1(Material(), Vector(0, 7, 5), 7);
 
-	Sphere left_wall(Vector(-1000, 0, 0), 940, Vector(0.5, 0.8, 0.1));
-	Sphere right_wall(Vector(1000, 0, 0), 940, Vector(0.9, 0.2, 0.3));
-	Sphere ceiling(Vector(0, 1000, 0), 940, Vector(0.3, 0.5, 0.3));
-	Sphere floor(Vector(0, -1000, 0), 1000, Vector(0.6, 0.8, 0.7));
-	Sphere front_wall(Vector(0, 0, -1000), 940, Vector(0.1, 0.6, 0.7));
-	Sphere behind_wall(Vector(0, 0, 1000), 940, Vector(0.0, 0.2, 0.9));
+	Sphere left_wall(Material(Vector(0.5, 0.8, 0.1)), Vector(-1000, 0, 0), 940);
+	Sphere right_wall(Material(Vector(0.9, 0.2, 0.3)), Vector(1000, 0, 0), 940);
+	Sphere ceiling(Material(Vector(0.3, 0.5, 0.3)), Vector(0, 1000, 0), 940);
+	Sphere floor(Material(Vector(0.6, 0.8, 0.7)), Vector(0, -1000, 0), 1000);
+	Sphere front_wall(Material(Vector(0.1, 0.6, 0.7)), Vector(0, 0, -1000), 940);
+	Sphere behind_wall(Material(Vector(0.0, 0.2, 0.9)), Vector(0, 0, 1000), 940);
 
 	Vector camera_center(0, 0, 50);	
 	double alpha = 60.*M_PI/180.;
@@ -305,7 +335,6 @@ int main() {
 	Scene scene(L, I);
 
 	scene.add_sphere(s1);
-	scene.add_sphere(s2);
 
 	scene.add_sphere(left_wall);
 	scene.add_sphere(right_wall);
