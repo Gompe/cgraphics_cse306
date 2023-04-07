@@ -64,6 +64,33 @@ public:
 	void set_is_mirror(bool is_mirror) {this->is_mirror = is_mirror;}
 	void set_is_transparent(bool is_transparent) {this->is_transparent = is_transparent;}
 	void set_refractive_index(double refractive_index) {this->refractive_index = refractive_index;}
+
+	bool operator==(const Material& other) {
+		return (
+			is_mirror == other.is_mirror &&
+			is_transparent == other.is_transparent &&
+			refractive_index == other.refractive_index &&
+			albedo[0] == other.albedo[0] &&
+			albedo[1] == other.albedo[1] &&
+			albedo[2] == other.albedo[2]
+		);
+	}
+};
+
+class HitInfo {
+public:
+	bool is_hit = false;
+	Vector P; 
+	Vector N;
+	Material material;
+
+	void set_is_hit(bool is_hit){this->is_hit = is_hit;}
+	void store_hit(const Vector& P, const Vector& N, const Material& material){
+		is_hit = true;
+		this->P = P;
+		this->N = N;
+		this->material = material;
+	}
 };
 
 class Sphere {
@@ -93,22 +120,22 @@ public:
 		return material.albedo;
 	}
 
-	bool intersect(const Ray& r, Vector& P, Vector& N, double& t) const {
+	void intersect(const Ray& r, HitInfo& hit_info) const {
+		hit_info.set_is_hit(false);
 		double delta = sqr(dot(r.u, r.O - C)) - dot(r.O - C, r.O - C) + R * R;
 		if (delta >= 0) {
 			double t2 = dot(r.u, C - r.O) + sqrt(delta);
-			if (t2 < 0) return false;
-			
-			double t1 = dot(r.u, C - r.O) - sqrt(delta);
-			t = (t1 > 0) ? t1 : t2;
+			if (t2 >= 0){
+				double t1 = dot(r.u, C - r.O) - sqrt(delta);
+				double t = (t1 > 0) ? t1 : t2;
 
-			P = r.O + t * r.u;
-			N = P - C;
-			N = N.normalized();
-			
-			return true;
+				Vector P = r.O + t * r.u;
+				Vector N = P - C;
+				N = N.normalized();
+				
+				hit_info.store_hit(P, N, material);
+			}
 		}
-		return false;
 	}
 
 
@@ -130,124 +157,111 @@ public:
 		return k0 + (1-k0)*std::pow(1 - dot(omega_i, N), 5);
 	}
 
-	bool intersect(const Ray& r, Vector& P, Vector& N, double& t, size_t& sphere_idx) const {
-		bool has_intersection = false;
-		t = std::numeric_limits<double>::max();
+
+	void intersect(const Ray& ray, HitInfo& hit_info) const {
+		hit_info.set_is_hit(false);
+		double first_hit_distance_2 = std::numeric_limits<double>::max();
+
 		for(size_t i = 0; i < objects.size(); i++) {
-			double t_tmp;
-			Vector P_tmp, N_tmp;
-			if (objects[i].intersect(r, P_tmp, N_tmp, t_tmp)) {
-				if (t_tmp < t) {
-					t = t_tmp;
-					P = P_tmp;
-					N = N_tmp;
-					sphere_idx = i;
-					has_intersection = true;
+			HitInfo possible_hit;
+			objects[i].intersect(ray, possible_hit);
+
+			if (possible_hit.is_hit) {
+				double hit_distance_2 = (ray.O - possible_hit.P).norm2();
+				if (hit_distance_2 < first_hit_distance_2) {
+					first_hit_distance_2 = hit_distance_2;
+					hit_info = possible_hit;
 				}
 			}
 		}
-
-		return has_intersection;
 	}
 
 
 	double compute_visibility(const Vector& P, const Vector& N) const{
-		/* Returns the visibility at point P with normal N. */
+		// Returns the visibility at point P with normal N.
+
+		HitInfo hit_info;
+
+		// Make ray to the light source
 		Vector light_vector = L - P;
-		double distance_to_light_squared = light_vector.norm2();
+		Ray ray_to_source(P + EPSILON*N, light_vector.normalized());
 
-		light_vector = light_vector.normalized();
-		Ray light_ray(P + EPSILON*N, light_vector);
-
-		double t;
-
-		// Placeholder variables
-		Vector _0;
-		size_t _1;
-
-		if (intersect(light_ray, _0, _0, t, _1)) {
-			if (t*t < distance_to_light_squared) {
-				return 0.;
-			}
-		}
-
-		// No intersection
+		intersect(ray_to_source, hit_info);
+		if (hit_info.is_hit && light_vector.norm2() > (hit_info.P - P).norm2())
+			return 0.;
 		return 1.;
 	}
 
-	Vector directLighting(const Vector& P, const Vector& N, size_t sphere_id){
-		/* Returns direct lighting at point P of object sphre_id (normal also
-		passed for efficiency)*/
-		double visibility = compute_visibility(P, N);
+	Vector directLighting(const HitInfo& hit_info) {
+		double visibility = compute_visibility(hit_info.P, hit_info.N);
 		Vector Lo = Vector(0, 0, 0);
 
 		if (visibility == 0.0) {
 			return Lo;
 		}
 
-		Vector omega_i = L - P;
+		Vector omega_i = L - hit_info.P;
 
 		Lo = (
 			(I/(4*M_PI*omega_i.norm2())) *
-			(objects[sphere_id].albedo()/M_PI) * 
+			(hit_info.material.albedo/M_PI) * 
 			visibility *
-			std::max(0.0, cosine_similarity(N, omega_i))
+			std::max(0.0, cosine_similarity(hit_info.N, omega_i))
 		);
 
 		return Lo;
 	}
 
-	Vector indirectLighting(const Vector& P, const Vector& N, size_t sphere_id, int ray_depth){
+	Vector indirectLighting(const HitInfo& hit_info, int ray_depth){
 		if (ray_depth < 0) return Vector(0,0,0);
 
-		Ray random_ray = Ray(P + EPSILON*N, random_cos(N));
-		return objects[sphere_id].albedo() * getColor(random_ray, ray_depth-1);
+		Ray random_ray = Ray(hit_info.P + EPSILON*hit_info.N, random_cos(hit_info.N));
+		return hit_info.material.albedo * getColor(random_ray, ray_depth-1);
 	}
 
 	Vector getColor(const Ray& ray, int ray_depth){
 		if (ray_depth < 0) return Vector(0,0,0);
 
-		Vector P, N;
-		double t;
-		size_t sphere_id;
-		
-		if (!intersect(ray, P, N, t, sphere_id)){
-			return Vector(0,0,0);
+		HitInfo hit_info;
+
+		intersect(ray, hit_info);
+		if (!hit_info.is_hit) return Vector(0,0,0);
+		// Hit happens
+		Vector& P = hit_info.P;
+		Vector& N = hit_info.N;
+
+		if (hit_info.material.is_mirror) {
+			Vector mirror_direction = ray.u - 2 * dot(ray.u, N) * N;
+			Ray mirror_ray = Ray(P + EPSILON * N, mirror_direction);
+			return getColor(mirror_ray, ray_depth - 1);
 		}
 
-		// Intersection happens
-		if (objects[sphere_id].is_mirror()) {
-			Vector mirror_direction = ray.u - 2 * dot(ray.u, N) * N;
+		if (hit_info.material.is_transparent) {
+			double n1 = 1; 
+			double n2 = hit_info.material.refractive_index;
+
+			double cos_incidence = dot(ray.u, N);
+			bool is_inside_material = (cos_incidence > 0);
+
+			if (is_inside_material) {
+				std::swap(n1, n2);
+				N *= -1;
+				cos_incidence *= -1;
+			}
+			double n_ratio = n1/n2;
+			double rad = 1 - n_ratio*n_ratio*(1 - cos_incidence*cos_incidence);
+
+			if (rad < 0) {
+				// total reflection
+				Vector mirror_direction = ray.u - 2 * dot(ray.u, N) * N;
 				Ray mirror_ray = Ray(P + EPSILON * N, mirror_direction);
 				return getColor(mirror_ray, ray_depth - 1);
+			}
+			Vector transmitted_direction = n_ratio * (ray.u - cos_incidence * N) - sqrt(rad) * N;
+			return getColor(Ray(P - EPSILON*N, transmitted_direction), ray_depth-1);
 		}
 
-		if (objects[sphere_id].is_transparent()) {
-				double n1 = 1;
-				double n2 = 1.4;
-				double n = n1 / n2;
-				Vector Ntransp = N;
-				if (dot(ray.u, N) > 0) {
-					std::swap(n1, n2);
-					n = 1/n;
-					Ntransp = -Ntransp;
-				}
-				Vector tTangent, tNormal;
-				double cos = dot(ray.u, Ntransp);
-				tTangent = n * (ray.u - cos * Ntransp);
-				double rad = 1 - sqr(n) * (1 - sqr(cos));
-				if (rad < 0) {
-					Vector mirror_direction = ray.u - 2 * dot(ray.u, Ntransp) * Ntransp;
-					Ray mirror_ray = Ray(P - EPSILON * N, mirror_direction);
-					return getColor(mirror_ray, ray_depth - 1);
-				}
-				tNormal = -sqrt(rad) * Ntransp;
-				Ray refractiveRay(P - EPSILON * Ntransp, tTangent + tNormal);
-				return getColor(refractiveRay, ray_depth - 1); 
-		}
-
-		// return directLighting(P, N, sphere_id);
-		return directLighting(P, N, sphere_id) + indirectLighting(P, N, sphere_id, ray_depth);
+		return directLighting(hit_info) + indirectLighting(hit_info, ray_depth);
 	}
 
 	void add_sphere(const Sphere& s) {
@@ -320,21 +334,28 @@ int main() {
 	int H = 512;
 
 	Sphere s1(Material(), Vector(0, 7, 5), 7);
+	Sphere s2(Material(Vector(0,0,0.8)), Vector(-14, 7, 5), 7);
+
+	Material transparent_material = Material();
+	transparent_material.set_is_transparent(true);
+	Sphere s3(transparent_material, Vector(+14, 7, 5), 7);
 
 	Sphere left_wall(Material(Vector(0.5, 0.8, 0.1)), Vector(-1000, 0, 0), 940);
 	Sphere right_wall(Material(Vector(0.9, 0.2, 0.3)), Vector(1000, 0, 0), 940);
 	Sphere ceiling(Material(Vector(0.3, 0.5, 0.3)), Vector(0, 1000, 0), 940);
-	Sphere floor(Material(Vector(0.6, 0.8, 0.7)), Vector(0, -1000, 0), 1000);
-	Sphere front_wall(Material(Vector(0.1, 0.6, 0.7)), Vector(0, 0, -1000), 940);
-	Sphere behind_wall(Material(Vector(0.0, 0.2, 0.9)), Vector(0, 0, 1000), 940);
+	Sphere floor(Material(Vector(0.1, 0.1, 0.8)), Vector(0, -1000, 0), 1000);
+	Sphere front_wall(Material(Vector(0., 0.8, 0.4)), Vector(0, 0, -1000), 940);
+	Sphere behind_wall(Material(Vector(1., 0.2, 0.1)), Vector(0, 0, 1000), 940);
 
 	Vector camera_center(0, 0, 50);	
 	double alpha = 60.*M_PI/180.;
-	double I = 2E9;
+	double I = 8E9;
 	Vector L(-10, 20, 40);
 	Scene scene(L, I);
 
 	scene.add_sphere(s1);
+	scene.add_sphere(s2);
+	scene.add_sphere(s3);
 
 	scene.add_sphere(left_wall);
 	scene.add_sphere(right_wall);

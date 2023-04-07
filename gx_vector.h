@@ -21,7 +21,7 @@ public:
     Vector& operator*=(double rhs);
     Vector& operator/=(const Vector& rhs);
     Vector& operator/=(double rhs);
-    
+    Vector& operator=(const Vector& rhs);
 
     double norm2() const;
     double norm() const;

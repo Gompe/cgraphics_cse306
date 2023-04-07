@@ -52,6 +52,11 @@ Vector& Vector::operator/=(double rhs){
         coords[i] /= rhs;
     return *this;
 }
+Vector& Vector::operator=(const Vector& rhs){
+    for(int i=0; i<3; i++)
+        coords[i] = rhs[i];
+    return *this;
+}
 
 /* Not inplace operators */
 Vector operator+(const Vector& a, const Vector& b){
