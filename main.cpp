@@ -68,7 +68,7 @@ public:
 	void set_is_transparent(bool is_transparent) {this->is_transparent = is_transparent;}
 	void set_refractive_index(double refractive_index) {this->refractive_index = refractive_index;}
 	void set_light(double light_intensity) {
-		is_light = (light_intensity == 0.);
+		is_light = (light_intensity != 0.);
 		this->light_intensity = light_intensity;
 	}
 
@@ -246,18 +246,19 @@ public:
 		
 		Vector omega_i = (x_sphere - hit_info.P).normalized();
 		Vector N_sphere = (x_sphere - C).normalized();
+		double R2 = (x_sphere - hit_info.P).norm2();
 
 		double form_factor = (
-			std::max(0., dot(-omega_i, hit_info.N)) *
-			std::max(0., dot(omega_i, N_sphere)) /
+			std::max(0., dot(omega_i, hit_info.N)) *
+			std::max(0., dot(-omega_i, N_sphere)) /
 			(x_sphere - hit_info.P).norm2()
 		);
 
-		double pdf = std::max(0., dot(N_sphere, D))/(M_PI*R*R);
+		double pdf = std::max(0., dot(N_sphere, D))/(M_PI*R2);
 
 		Lo = (
 			(light_sphere.albedo()/M_PI) *
-			(light_sphere.light_intensity()/(4*M_PI*M_PI*R*R)) *
+			(light_sphere.light_intensity()/(4*M_PI*M_PI*R2)) *
 			form_factor /
 			pdf
 		);
@@ -269,10 +270,10 @@ public:
 		if (ray_depth < 0) return Vector(0,0,0);
 
 		Ray random_ray = Ray(hit_info.P + EPSILON*hit_info.N, random_cos(hit_info.N));
-		return hit_info.material.albedo * getColor(random_ray, ray_depth-1);
+		return hit_info.material.albedo * getColor(random_ray, ray_depth-1, true);
 	}
 
-	Vector getColor(const Ray& ray, int ray_depth){
+	Vector getColor(const Ray& ray, int ray_depth, bool last_bounce_diffuse=false){
 		if (ray_depth < 0) return Vector(0,0,0);
 
 		HitInfo hit_info;
@@ -282,6 +283,16 @@ public:
 		// Hit happens
 		Vector& P = hit_info.P;
 		Vector& N = hit_info.N;
+
+		if (hit_info.material.is_light) {
+			if (last_bounce_diffuse)
+				return Vector(0.,0.,0.);
+			else {
+				// different from lecture notes. Maybe change later
+				double R2 = (hit_info.P - ray.O).norm2();
+				return hit_info.material.albedo * hit_info.material.light_intensity / (4*M_PI*M_PI*R2);
+			}
+		}
 
 		if (hit_info.material.is_mirror) {
 			Vector mirror_direction = ray.u - 2 * dot(ray.u, N) * N;
@@ -314,7 +325,15 @@ public:
 			return getColor(Ray(P - EPSILON*N, transmitted_direction), ray_depth-1);
 		}
 
-		return directLighting(hit_info) + indirectLighting(hit_info, ray_depth);
+		// Demo code
+		Vector Lo_direct = directLighting(hit_info);
+		for (size_t i=0; i<objects.size(); i++) {
+			if (objects[i].is_light()) {
+				Lo_direct += directLighting(hit_info, objects[i]);
+			}
+		}
+
+		return Lo_direct + indirectLighting(hit_info, ray_depth);
 	}
 
 	void add_sphere(const Sphere& s) {
@@ -322,6 +341,7 @@ public:
 	}
 	std::vector<Sphere> objects;
 };
+
 
 class Camera{
 public:
@@ -387,11 +407,16 @@ int main() {
 	int H = 512;
 
 	Sphere s1(Material(), Vector(0, 7, 5), 7);
-	Sphere s2(Material(Vector(0,0,0.8)), Vector(-14, 7, 5), 7);
+	Sphere s2(Material(Vector(0.5,0.5,1.)), Vector(-14, 7, 5), 3);
+
+	// Try to play with this value later
+	s2.material.set_light(1E10); 
 
 	Material transparent_material = Material();
 	transparent_material.set_is_transparent(true);
 	Sphere s3(transparent_material, Vector(+14, 7, 5), 7);
+
+	Sphere s4(Material(), Vector(-14, 5, +12), 5);
 
 	Sphere left_wall(Material(Vector(0.5, 0.8, 0.1)), Vector(-1000, 0, 0), 940);
 	Sphere right_wall(Material(Vector(0.9, 0.2, 0.3)), Vector(1000, 0, 0), 940);
@@ -402,13 +427,16 @@ int main() {
 
 	Vector camera_center(0, 0, 50);	
 	double alpha = 60.*M_PI/180.;
-	double I = 8E9;
+	// double I = 8E9;
+	double I = 0;
+
 	Vector L(-10, 20, 40);
 	Scene scene(L, I);
 
 	scene.add_sphere(s1);
 	scene.add_sphere(s2);
 	scene.add_sphere(s3);
+	scene.add_sphere(s4);
 
 	scene.add_sphere(left_wall);
 	scene.add_sphere(right_wall);
@@ -448,7 +476,6 @@ int main() {
 			image[(i * W + j) * 3 + 2] = std::min(std::pow(color[2], 0.45), 255.);
 		}
 	}
-
 
 	stbi_write_png("image.png", W, H, 3, &image[0], 0);
 
