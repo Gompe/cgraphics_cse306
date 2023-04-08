@@ -345,21 +345,22 @@ public:
 
 class Camera{
 public:
-	Camera(Vector camera_center, int width, int height, double alpha){
+	Camera(Vector camera_center, int width, int height, double alpha, double aperture_radius=0){
 		this->camera_center = camera_center;
 		this->width = width;
 		this->height = height;
 		this->alpha = alpha;
+		this->aperture_radius = aperture_radius;
 
-		// precompute z direction of ray
-		_z_direction = -width/(2.*tan(alpha/2.));
+		// precompute distance from aperture to sensor
+		d_aperture_sensor = -width/(2.*tan(alpha/2.));
 	}
 
 	Vector camera_center;
 	int width;
 	int height;
 	double alpha;
-	double _z_direction;
+	double d_aperture_sensor;
 
 	Ray pixel_ray_center(int i, int j) const{
 		/* Returns the ray from the camera_center to pixel at (row, col) = (i,j) 
@@ -368,7 +369,7 @@ public:
 		Vector ray_direction;
 		ray_direction[0] = j - width/2. + 0.5;
 		ray_direction[1] = -i + height/2. + 0.5;
-		ray_direction[2] = _z_direction;
+		ray_direction[2] = d_aperture_sensor;
 		ray_direction = ray_direction.normalized();
 
 		return Ray(camera_center, ray_direction);
@@ -382,7 +383,7 @@ public:
 		Vector ray_direction;
 		ray_direction[0] = j - width/2. + random_uniform();
 		ray_direction[1] = -i + height/2. + random_uniform();
-		ray_direction[2] = _z_direction;
+		ray_direction[2] = d_aperture_sensor;
 		ray_direction = ray_direction.normalized();
 
 		return Ray(camera_center, ray_direction);
@@ -395,7 +396,7 @@ public:
 
 		ray_direction[0] += j - width/2. + 0.5;
 		ray_direction[1] += -i + height/2. + 0.5;
-		ray_direction[2] = _z_direction;
+		ray_direction[2] = d_aperture_sensor;
 		ray_direction = ray_direction.normalized();
 
 		return Ray(camera_center, ray_direction);
