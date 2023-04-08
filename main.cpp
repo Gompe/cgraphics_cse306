@@ -345,22 +345,44 @@ public:
 
 class Camera{
 public:
-	Camera(Vector camera_center, int width, int height, double alpha, double aperture_radius=0){
+	// Create Better Design with Inheritance Later...
+
+	// Pinhole Camera
+	Camera(Vector camera_center, int width, int height, double alpha){
 		this->camera_center = camera_center;
 		this->width = width;
 		this->height = height;
 		this->alpha = alpha;
-		this->aperture_radius = aperture_radius;
 
 		// precompute distance from aperture to sensor
-		d_aperture_sensor = -width/(2.*tan(alpha/2.));
+		z_film = -width/(2.*tan(alpha/2.));
+	}
+
+	// Thin Lens Camera
+	Camera(Vector camera_center, int width, int height, double alpha, double focal_distance, double radius_aperture){
+		this->camera_center = camera_center;
+		this->width = width;
+		this->height = height;
+		this->alpha = alpha;
+
+		this->focal_distance = focal_distance;
+		this->radius_aperture = radius_aperture;
+		is_thin_lens = true;
+
+		// precompute distance from aperture to sensor
+		z_film = -width/(2.*tan(alpha/2.));
 	}
 
 	Vector camera_center;
 	int width;
 	int height;
 	double alpha;
-	double d_aperture_sensor;
+	double z_film;
+
+	// Thin Lens Camera
+	double focal_distance;
+	double radius_aperture;
+	bool is_thin_lens = false;
 
 	Ray pixel_ray_center(int i, int j) const{
 		/* Returns the ray from the camera_center to pixel at (row, col) = (i,j) 
@@ -369,7 +391,7 @@ public:
 		Vector ray_direction;
 		ray_direction[0] = j - width/2. + 0.5;
 		ray_direction[1] = -i + height/2. + 0.5;
-		ray_direction[2] = d_aperture_sensor;
+		ray_direction[2] = z_film;
 		ray_direction = ray_direction.normalized();
 
 		return Ray(camera_center, ray_direction);
@@ -383,7 +405,7 @@ public:
 		Vector ray_direction;
 		ray_direction[0] = j - width/2. + random_uniform();
 		ray_direction[1] = -i + height/2. + random_uniform();
-		ray_direction[2] = d_aperture_sensor;
+		ray_direction[2] = z_film;
 		ray_direction = ray_direction.normalized();
 
 		return Ray(camera_center, ray_direction);
@@ -396,10 +418,24 @@ public:
 
 		ray_direction[0] += j - width/2. + 0.5;
 		ray_direction[1] += -i + height/2. + 0.5;
-		ray_direction[2] = d_aperture_sensor;
+		ray_direction[2] = z_film;
 		ray_direction = ray_direction.normalized();
 
 		return Ray(camera_center, ray_direction);
+	}
+
+	Ray pixel_ray_dof(int i, int j) const {
+		// Returns random ray to simulate DoF and Antialiasing
+		Ray center_ray(pixel_ray_gaussian(i, j));
+		Vector P_focus = camera_center + (focal_distance/std::abs(center_ray.u[2]))*center_ray.u;
+
+		// Generate a random point in the lens - later change this to gx_random
+		double r = random_uniform() * sqrt(radius_aperture);
+		double theta = random_uniform() * 2 * M_PI;
+
+		Vector random_point_lens = camera_center + Vector(r*sin(theta), r*cos(theta), 0.);
+
+		return Ray(random_point_lens, (P_focus-random_point_lens).normalized());
 	}
 };
 
@@ -413,11 +449,10 @@ int main() {
 	// Try to play with this value later
 	s2.material.set_light(1E10); 
 
-	Material transparent_material = Material();
-	transparent_material.set_is_transparent(true);
-	Sphere s3(transparent_material, Vector(+14, 7, 5), 7);
+	Sphere s3(Material(Vector(0.8, 0.4, 0.8)), Vector(+14, 7, +20), 7);
 
 	Sphere s4(Material(), Vector(-14, 5, +12), 5);
+	Sphere s5(Material(Vector(0.5, 1., 0.5)), Vector(+1, 0, +45), 1);
 
 	Sphere left_wall(Material(Vector(0.5, 0.8, 0.1)), Vector(-1000, 0, 0), 940);
 	Sphere right_wall(Material(Vector(0.9, 0.2, 0.3)), Vector(1000, 0, 0), 940);
@@ -427,17 +462,19 @@ int main() {
 	Sphere behind_wall(Material(Vector(1., 0.2, 0.1)), Vector(0, 0, 1000), 940);
 
 	Vector camera_center(0, 0, 50);	
+
 	double alpha = 60.*M_PI/180.;
 	// double I = 8E9;
-	double I = 0;
+	double I = 4E9;
 
-	Vector L(-10, 20, 40);
+	Vector L(-10, 20, 50);
 	Scene scene(L, I);
 
 	scene.add_sphere(s1);
 	scene.add_sphere(s2);
 	scene.add_sphere(s3);
 	scene.add_sphere(s4);
+	scene.add_sphere(s5);
 
 	scene.add_sphere(left_wall);
 	scene.add_sphere(right_wall);
@@ -446,8 +483,19 @@ int main() {
 	scene.add_sphere(front_wall);
 	scene.add_sphere(behind_wall);
 
+	// Input
+	double focal_distance;
+	double radius_aperture;
 
-	Camera camera(camera_center, W, H, alpha);
+	std::cout << "Focal distance: ";
+	std::cin >> focal_distance;
+	//focal_distance = 80;
+
+	std::cout << "Aperture radius: ";
+	std::cin >> radius_aperture;
+	// radius_aperture = 1E-5;
+
+	Camera camera(camera_center, W, H, alpha, focal_distance, radius_aperture);
 
 	std::vector<unsigned char> image(W * H * 3, 0);
 
@@ -461,7 +509,8 @@ int main() {
 			Vector color = Vector(0,0,0);
 
 			for(int _counter=0; _counter<NUMBER_OF_RAYS; _counter++){
-				Ray r = camera.pixel_ray_gaussian(i, j);
+				Ray r = camera.pixel_ray_dof(i, j);
+				// Ray r = camera.pixel_ray_gaussian(i, j);
 				color = color + scene.getColor(r, 5);
 			}
 
