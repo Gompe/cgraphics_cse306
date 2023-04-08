@@ -1,5 +1,4 @@
-#ifndef GX_VECTOR
-#define GX_VECTOR
+#pragma once
 
 #include <ostream>
 #include <vector>
@@ -51,5 +50,3 @@ double cosine_similarity(const Vector& a, const Vector& b);
 Vector cross(const Vector& a, const Vector& b);
 
 std::ostream& operator<<(std::ostream& os, const Vector& rhs);
-
-#endif

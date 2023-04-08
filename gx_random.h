@@ -1,5 +1,4 @@
-#ifndef GX_RANDOM
-#define GX_RANDOM
+#pragma once
 
 #include <random>
 
@@ -10,4 +9,3 @@
 double random_uniform();
 void boxMuller(double stdev, double &x, double &y);
 
-#endif
