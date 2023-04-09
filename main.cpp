@@ -16,7 +16,7 @@
 
 #include "gx_vector.h"
 #include "gx_random.h"
-
+#include "gx_mesh.h"
 
 double sqr(double x) {
 	return x * x;
@@ -100,21 +100,17 @@ public:
 	}
 };
 
-class Sphere {
+class Geometry {
+	// Class to represent shapes (Spheres, Triangle Meshes, etc.)
 public:
-	// ...
-	Sphere(const Material& m, const Vector& C, double R) {
-		this->C = C;
-		this->R = R;
+	Material material; 
+
+	Geometry(const Material& m) {
 		material = m;
-	}	
+	}
+
+	virtual void intersect(const Ray& ray, HitInfo& hit_info) const = 0;
 	
-	Vector C;
-	double R;
-
-	Material material;
-
-	// Getters
 	bool is_mirror() const {
 		return material.is_mirror;
 	}
@@ -134,6 +130,18 @@ public:
 	double light_intensity() const {
 		return material.light_intensity;
 	}
+};
+
+class Sphere : public Geometry
+{
+public:
+	// ...
+	Sphere(const Material& m, const Vector& C, double R)
+	: Geometry(m), C(C), R(R) 
+	{}
+	
+	Vector C;
+	double R;
 
 	void intersect(const Ray& r, HitInfo& hit_info) const {
 		hit_info.set_is_hit(false);
@@ -152,8 +160,6 @@ public:
 			}
 		}
 	}
-
-
 };
 
 class Scene {
