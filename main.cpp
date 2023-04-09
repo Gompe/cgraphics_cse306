@@ -105,26 +105,6 @@ public:
 	}
 
 	virtual void intersect(const Ray& ray, HitInfo& hit_info) const = 0;
-	
-	bool is_mirror() const {
-		return material.is_mirror;
-	}
-
-	bool is_transparent() const {
-		return material.is_transparent;
-	}
-
-	const Vector& albedo() const {
-		return material.albedo;
-	}
-
-	bool is_light() const {
-		return material.is_light;
-	}
-
-	double light_intensity() const {
-		return material.light_intensity;
-	}
 };
 
 class Sphere : public Geometry
@@ -258,8 +238,8 @@ public:
 		double pdf = std::max(0., dot(N_sphere, D))/(M_PI*R2);
 
 		Lo = (
-			(light_sphere.albedo()/M_PI) *
-			(light_sphere.light_intensity()/(4*M_PI*M_PI*R2)) *
+			(light_sphere.material.albedo/M_PI) *
+			(light_sphere.material.light_intensity/(4*M_PI*M_PI*R2)) *
 			form_factor /
 			pdf
 		);
@@ -329,7 +309,7 @@ public:
 		// Demo code
 		Vector Lo_direct = directLighting(hit_info);
 		for (size_t i=0; i<objects.size(); i++) {
-			if (objects[i].is_light()) {
+			if (objects[i].material.is_light) {
 				Lo_direct += directLighting(hit_info, objects[i]);
 			}
 		}
