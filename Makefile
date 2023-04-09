@@ -1,5 +1,5 @@
 render: main.cpp
-	g++ -O2 main.cpp gx_vector.cpp gx_random.cpp gx_mesh.cpp -fopenmp -o render
+	g++ -O2 main.cpp gx_vector.cpp gx_random.cpp gx_camera.cpp gx_mesh.cpp -fopenmp -o render
 
 clean:
 	rm render

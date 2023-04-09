@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 
+// Vector Declaration
 class Vector{
 public:
     Vector();
@@ -50,3 +51,12 @@ double cosine_similarity(const Vector& a, const Vector& b);
 Vector cross(const Vector& a, const Vector& b);
 
 std::ostream& operator<<(std::ostream& os, const Vector& rhs);
+
+// Ray Declaration
+class Ray
+{
+public:
+    Ray(const Vector&O, const Vector& u);
+    Vector O;
+    Vector u;
+};

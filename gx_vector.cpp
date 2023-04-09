@@ -169,3 +169,8 @@ std::ostream& operator<<(std::ostream& os, const Vector& rhs){
     os << "(" << rhs[0] << "," << rhs[1] << "," << rhs[2] << ")";
     return os;
 }
+
+// ----- Ray Implementation 
+Ray::Ray(const Vector& O, const Vector& u)
+: O(O), u(u)
+{}

@@ -16,6 +16,7 @@
 
 #include "gx_vector.h"
 #include "gx_random.h"
+#include "gx_camera.h"
 #include "gx_mesh.h"
 
 double sqr(double x) {
@@ -42,12 +43,6 @@ Vector random_cos(const Vector& N){
 	return x*T1 + y*T2 + z*N;
 }
 
-class Ray {
-public:
-	Ray(const Vector& O, const Vector& u) : O(O), u(u) {};
-	Vector O;
-	Vector u;
-};
 
 class Material {
 public:
@@ -348,103 +343,6 @@ public:
 	std::vector<Sphere> objects;
 };
 
-
-class Camera{
-public:
-	// Create Better Design with Inheritance Later...
-
-	// Pinhole Camera
-	Camera(Vector camera_center, int width, int height, double alpha){
-		this->camera_center = camera_center;
-		this->width = width;
-		this->height = height;
-		this->alpha = alpha;
-
-		// precompute distance from aperture to sensor
-		z_film = -width/(2.*tan(alpha/2.));
-	}
-
-	// Thin Lens Camera
-	Camera(Vector camera_center, int width, int height, double alpha, double focal_distance, double radius_aperture){
-		this->camera_center = camera_center;
-		this->width = width;
-		this->height = height;
-		this->alpha = alpha;
-
-		this->focal_distance = focal_distance;
-		this->radius_aperture = radius_aperture;
-		is_thin_lens = true;
-
-		// precompute distance from aperture to sensor
-		z_film = -width/(2.*tan(alpha/2.));
-	}
-
-	Vector camera_center;
-	int width;
-	int height;
-	double alpha;
-	double z_film;
-
-	// Thin Lens Camera
-	double focal_distance;
-	double radius_aperture;
-	bool is_thin_lens = false;
-
-	Ray pixel_ray_center(int i, int j) const{
-		/* Returns the ray from the camera_center to pixel at (row, col) = (i,j) 
-		The ray points directly from the camera to the pixel center.
-		*/
-		Vector ray_direction;
-		ray_direction[0] = j - width/2. + 0.5;
-		ray_direction[1] = -i + height/2. + 0.5;
-		ray_direction[2] = z_film;
-		ray_direction = ray_direction.normalized();
-
-		return Ray(camera_center, ray_direction);
-	}
-
-	Ray pixel_ray_uniform(int i, int j) const{
-		/* Returns a ray from the camera_center to pixel at (row, col) = (i,j) 
-		The ray points from the camera to a random position in the pixel.
-		*/
-
-		Vector ray_direction;
-		ray_direction[0] = j - width/2. + random_uniform();
-		ray_direction[1] = -i + height/2. + random_uniform();
-		ray_direction[2] = z_film;
-		ray_direction = ray_direction.normalized();
-
-		return Ray(camera_center, ray_direction);
-	}
-
-	Ray pixel_ray_gaussian(int i, int j) const{
-		Vector ray_direction(0,0,0);
-		// Random displacement from center
-		boxMuller(0.5, ray_direction[0], ray_direction[1]);
-
-		ray_direction[0] += j - width/2. + 0.5;
-		ray_direction[1] += -i + height/2. + 0.5;
-		ray_direction[2] = z_film;
-		ray_direction = ray_direction.normalized();
-
-		return Ray(camera_center, ray_direction);
-	}
-
-	Ray pixel_ray_dof(int i, int j) const {
-		// Returns random ray to simulate DoF and Antialiasing
-		Ray center_ray(pixel_ray_gaussian(i, j));
-		Vector P_focus = camera_center + (focal_distance/std::abs(center_ray.u[2]))*center_ray.u;
-
-		// Generate a random point in the lens - later change this to gx_random
-		double r = random_uniform() * sqrt(radius_aperture);
-		double theta = random_uniform() * 2 * M_PI;
-
-		Vector random_point_lens = camera_center + Vector(r*sin(theta), r*cos(theta), 0.);
-
-		return Ray(random_point_lens, (P_focus-random_point_lens).normalized());
-	}
-};
-
 int main() {
 	int W = 512;
 	int H = 512;
@@ -501,7 +399,7 @@ int main() {
 	std::cin >> radius_aperture;
 	// radius_aperture = 1E-5;
 
-	Camera camera(camera_center, W, H, alpha, focal_distance, radius_aperture);
+	ProjectiveCamera camera(camera_center, W, H, alpha, focal_distance, radius_aperture);
 
 	std::vector<unsigned char> image(W * H * 3, 0);
 
@@ -515,7 +413,7 @@ int main() {
 			Vector color = Vector(0,0,0);
 
 			for(int _counter=0; _counter<NUMBER_OF_RAYS; _counter++){
-				Ray r = camera.pixel_ray_dof(i, j);
+				Ray r = camera.generate_ray(i, j);
 				// Ray r = camera.pixel_ray_gaussian(i, j);
 				color = color + scene.getColor(r, 5);
 			}
