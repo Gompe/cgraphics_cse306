@@ -6,6 +6,11 @@ Sphere::Sphere(const Vector& C, double R)
 : C(C), R(R)
 {}
 
+Geometry* Sphere::clone() const
+{
+    return new Sphere(*this);
+}
+
 bool Sphere::intersect(const Ray& ray, GeometryHit& gHit) const {
     Vector d = ray.O-C;
     double a = dot(ray.u, d);

@@ -241,17 +241,16 @@ int main() {
 	int H = 512;
 
 	Object sphere_1(
-		new Sphere(Vector(0, 7, 5), 7),
+		Sphere(Vector(0, 7, 5), 7),
 		Material()
 	);
 
 	Object sphere_2(
-		new Sphere(Vector(-14, 7, 5), 3),
+		Sphere(Vector(-14, 7, 5), 3),
 		Material()
 	);
 
 	sphere_2.material.set_light(1E10);
-
 
 	// Sphere s3(Material(Vector(0.8, 0.4, 0.8)), Vector(+14, 7, +20), 7);
 
@@ -259,32 +258,32 @@ int main() {
 	// Sphere s5(Material(Vector(0.5, 1., 0.5)), Vector(+1, 0, +45), 1);
 
 	Object left_wall(
-		new Sphere(Vector(-1000, 0, 0), 940),
+		Sphere(Vector(-1000, 0, 0), 940),
 		Material(Vector(0.5, 0.8, 0.1))
 	);
 
 	Object right_wall(
-		new Sphere(Vector(1000, 0, 0), 940),
+		Sphere(Vector(1000, 0, 0), 940),
 		Material(Vector(0.9, 0.2, 0.3))
 	);
 
 	Object ceiling(
-		new Sphere(Vector(0, 1000, 0), 940),
+		Sphere(Vector(0, 1000, 0), 940),
 		Material(Vector(0.3, 0.5, 0.3))
 	);
 
 	Object floor(
-		new Sphere(Vector(0, -1000, 0), 1000),
+		Sphere(Vector(0, -1000, 0), 1000),
 		Material((Vector(0.1, 0.1, 0.8)))
 	);	
 
 	Object front_wall(
-		new Sphere(Vector(0, 0, -1000), 940),
+		Sphere(Vector(0, 0, -1000), 940),
 		Material(Vector(0., 0.8, 0.4))
 	);
 
 	Object behind_wall(
-		new Sphere(Vector(0, 0, 1000), 940),
+		Sphere(Vector(0, 0, 1000), 940),
 		Material(Vector(1., 0.2, 0.1))
 	);
 

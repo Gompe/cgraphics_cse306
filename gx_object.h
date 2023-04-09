@@ -8,8 +8,15 @@ class ObjectHit;
 class Object
 {
 public:
-    Object(Geometry* g, const Material& m);
-    Geometry * const geometry_ptr;
+    Object() = delete;
+    Object(const Geometry& g, const Material& m);
+    Object(const Object& other);
+    Object(Object&& other);
+    Object& operator=(const Object& other);
+
+    ~Object();
+
+    Geometry *geometry_ptr;
     Material material;
 
     bool intersect(const Ray& ray, ObjectHit& hitInfo) const;
