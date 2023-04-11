@@ -26,3 +26,10 @@ incremental: $(OBJS)
 .PHONY: clean
 clean:
 	$(RM) $(OBJS) $(EXE)
+
+.PHONY: clean_test
+clean_test:
+	$(RM) *.test.exe
+
+test_vector: tests/test_vector.cpp gx_vector.cpp gx_vector.h
+	$(CXX) -o test_vector.test.exe tests/test_vector.cpp gx_vector.cpp $(CXXFLAGS) 

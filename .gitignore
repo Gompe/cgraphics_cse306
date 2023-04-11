@@ -1,3 +1,4 @@
 render
 ./build
 ./image.png
+*.test.exe

@@ -11,6 +11,7 @@ public:
     Vector();
     explicit Vector(double x,double y, double z);
     Vector(const Vector& other);
+    Vector(Vector&& other);
 
     double operator[](int i) const;
     double& operator[](int i);
@@ -61,3 +62,39 @@ public:
     Vector O;
     Vector u;
 };
+
+// Declaration of 3x3 Matrix
+class Matrix
+{
+public:
+    Matrix() = default;
+
+    // Creates matrix row by row
+    explicit Matrix(const Vector& q1, const Vector& q2, const Vector& q3);
+    explicit Matrix(const double matrix[3][3]);
+
+    // Gets row i
+    Vector operator[](int i) const;
+    Vector& operator[](int i);
+
+    Matrix& operator*=(double rhs);
+    Matrix& operator/=(double rhs);
+    Matrix& operator*=(const Matrix& rhs);
+
+    Matrix transpose() const;
+    Matrix& inplaceTranspose();
+
+private:
+    Vector q[3];
+};
+
+Matrix operator+(const Matrix& a, const Matrix& b);
+Matrix operator-(const Matrix& a, const Matrix& b);
+Matrix operator*(const Matrix& a, const Matrix& b);
+Matrix operator*(const double a, const Matrix& b);
+Matrix operator*(const Matrix& a, const double b);
+Matrix operator/(const Matrix& a, const double b);
+Matrix operator-(const Matrix& a);
+Vector operator*(const Matrix& a, const Vector& b);
+
+std::ostream& operator<<(std::ostream& os, const Matrix& rhs);
