@@ -10,7 +10,7 @@ class Object
 public:
     Object() = delete;
     Object(const Geometry& g, const Material& m);
-    Object(const Object& other);
+    Object(const Object& other) = delete; // Ideally delete later...
     Object(Object&& other);
     Object& operator=(const Object& other);
 
@@ -20,6 +20,7 @@ public:
     Material material;
 
     bool intersect(const Ray& ray, ObjectHit& hitInfo) const;
+    bool updateIntersect(const Ray& ray, ObjectHit& hitInfo) const;
 };
 
 class ObjectHit : public GeometryHit

@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "./stb/stb_image_write.h"
@@ -80,6 +81,19 @@ public:
 					hasIntersection = true;
 				}
 			}
+		}
+		return hasIntersection;
+	}
+
+	bool updateIntersect(const Ray& ray, ObjectHit& hitInfo) const
+	{	
+		bool hasIntersection = false;
+		for (const auto& object : objects) {
+			// NOTE: Try to understand why (const auto object : objects) by value fails
+			// reason: pointer to object in hitInfo is meaningless...
+
+			// NOTE: hasIntersection = hasIntersection || object.updateIntersect(ray, hitInfo); WILL NOT WORK!!!
+			hasIntersection = object.updateIntersect(ray, hitInfo) || hasIntersection;
 		}
 		return hasIntersection;
 	}
@@ -161,9 +175,15 @@ public:
 	Vector getColor(const Ray& ray, int ray_depth, bool last_bounce_diffuse=false){
 		if (ray_depth < 0) return Vector(0,0,0);
 
+		// CHANGE SO THAT INIT SETS TO DOUBLE MAX
 		ObjectHit hitInfo;
+		hitInfo.tHit = std::numeric_limits<double>::max();
+
+		// if (!updateIntersect(ray, hitInfo))
+		// 	return Vector(0.,0.,0.);
+
 		if (!intersect(ray, hitInfo))
-			return Vector(0.,0.,0.);
+			return Vector();
 
 		// Hit happens
 		Vector& P = hitInfo.P;
@@ -230,8 +250,8 @@ public:
 		return Lo_direct + indirectLighting(hitInfo, ray_depth);
 	}
 
-	void add_sphere(const Object& object) {
-		objects.push_back(object);
+	void insertObject(Object&& object) {
+		objects.push_back(std::move(object));
 	}
 
 };
@@ -252,10 +272,20 @@ int main() {
 
 	sphere_2.material.set_light(1E10);
 
-	// Sphere s3(Material(Vector(0.8, 0.4, 0.8)), Vector(+14, 7, +20), 7);
+	Object s3(
+		Sphere(Vector(+14, 7, +20), 7),
+		Material(Vector(0.8, 0.4, 0.8))
+	);
 
-	// Sphere s4(Material(), Vector(-14, 5, +12), 5);
-	// Sphere s5(Material(Vector(0.5, 1., 0.5)), Vector(+1, 0, +45), 1);
+	Object s4(
+		Sphere(Vector(-14, 5, +12), 5),
+		Material()
+	);
+
+	Object s5(
+		Sphere(Vector(+1, 0, +45), 1),
+		Material(Vector(0.5, 1., 0.5))
+	);
 
 	Object left_wall(
 		Sphere(Vector(-1000, 0, 0), 940),
@@ -296,18 +326,18 @@ int main() {
 	Vector L(-10, 20, 50);
 	Scene scene(L, I);
 
-	scene.add_sphere(sphere_1);
-	scene.add_sphere(sphere_2);
-	// scene.add_sphere(s3);
-	// scene.add_sphere(s4);
-	// scene.add_sphere(s5);
+	scene.insertObject(std::move(sphere_1));
+	scene.insertObject(std::move(sphere_2));
+	scene.insertObject(std::move(s3));
+	scene.insertObject(std::move(s4));
+	scene.insertObject(std::move(s5));
 
-	scene.add_sphere(left_wall);
-	scene.add_sphere(right_wall);
-	scene.add_sphere(ceiling);
-	scene.add_sphere(floor);
-	scene.add_sphere(front_wall);
-	scene.add_sphere(behind_wall);
+	scene.insertObject(std::move(left_wall));
+	scene.insertObject(std::move(right_wall));
+	scene.insertObject(std::move(ceiling));
+	scene.insertObject(std::move(floor));
+	scene.insertObject(std::move(front_wall));
+	scene.insertObject(std::move(behind_wall));
 
 	// Input
 	double focal_distance;
@@ -329,6 +359,9 @@ int main() {
 	std::cout << "Number of rays:";
 	std::cin >> NUMBER_OF_RAYS;
 
+	
+	auto start = std::chrono::high_resolution_clock::now();
+
 	#pragma omp parallel for
 	for (int i = 0; i < H; i++) {
 		for (int j = 0; j < W; j++) {
@@ -336,7 +369,6 @@ int main() {
 
 			for(int _counter=0; _counter<NUMBER_OF_RAYS; _counter++){
 				Ray r = camera.generate_ray(i, j);
-				// Ray r = camera.pixel_ray_gaussian(i, j);
 				color = color + scene.getColor(r, 5);
 			}
 
@@ -352,6 +384,10 @@ int main() {
 			image[(i * W + j) * 3 + 2] = std::min(std::pow(color[2], 0.45), 255.);
 		}
 	}
+
+	auto end = std::chrono::high_resolution_clock::now();
+	auto time_elapsed = std::chrono::duration<double>(end - start).count();
+	std::cout << "waited " << 1000*time_elapsed << std::endl;
 
 	stbi_write_png("image.png", W, H, 3, &image[0], 0);
 

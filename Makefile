@@ -1,11 +1,28 @@
-render: main.cpp
-	g++ -O2 main.cpp gx_vector.cpp gx_random.cpp gx_camera.cpp gx_mesh.cpp gx_material.cpp gx_geometry.cpp gx_object.cpp -fopenmp -o render
+CXX=g++
+CXXFLAGS=-std=c++17 -O3
 
-debug: main.cpp
-	g++ -g main.cpp gx_vector.cpp gx_random.cpp gx_camera.cpp gx_mesh.cpp gx_material.cpp gx_geometry.cpp gx_object.cpp -fopenmp -o render
+EXE=render
+ODIR=build
 
+SRCS = $(wildcard *.cpp)
+DEPS = $(wildcard *.h)
+_OBJS = $(subst .cpp,.o,$(SRCS))
+OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
+
+LIBS=-fopenmp
+
+RM=rm -f
+
+$(ODIR)/%.o: %.cpp $(DEPS)
+	$(CXX) -c -o $@ $< $(CXXFLAGS)
+
+render: $(SRCS) $(DEPS)
+	$(CXX) -o render $(SRCS) $(CXXFLAGS) $(LIBS)
+
+.PHONY: incremental
+incremental: $(OBJS)
+	$(CXX) -o render $^ $(CXXFLAGS) $(LIBS)
+
+.PHONY: clean
 clean:
-	rm render
-
-remove:
-	rm image.png render
+	$(RM) $(OBJS) $(EXE)

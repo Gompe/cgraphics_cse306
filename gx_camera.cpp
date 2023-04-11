@@ -34,7 +34,7 @@ Ray PinholeCamera::generate_ray(int i, int j) const
 }
 
 ProjectiveCamera::ProjectiveCamera(const Vector& camera_center, int W, int H, double alpha,
-double focal_distance, double radius_aperture)
+double focal_distance, double lens_radius)
 : Camera(camera_center, W, H, alpha), focal_distance(focal_distance), lens_radius(lens_radius)
 {}
 

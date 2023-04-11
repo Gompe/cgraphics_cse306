@@ -10,6 +10,7 @@ class Vector{
 public:
     Vector();
     explicit Vector(double x,double y, double z);
+    Vector(const Vector& other);
 
     double operator[](int i) const;
     double& operator[](int i);

@@ -12,6 +12,13 @@ Vector::Vector(double x,double y, double z){
     coords[2] = z;
 }
 
+Vector::Vector(const Vector& other)
+{
+    coords[0] = other[0];
+    coords[1] = other[1];
+    coords[2] = other[2];
+}
+
 /* Getters and Setters*/
 double Vector::operator[](int i) const {
     return coords[i];

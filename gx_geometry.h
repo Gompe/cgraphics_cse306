@@ -12,8 +12,13 @@ public:
 class BoundingBox
 {
 public:
-    double tx0, ty0, tz0;
-    double tx1, ty1, tz1;
+    BoundingBox() = default;
+    BoundingBox(double x0, double y0, double z0, double x1, double y1, double z1);
+    double x0, y0, z0;
+    double x1, y1, z1;
+
+    bool intersect(const Ray& ray) const;
+    bool intersect(const Ray& ray, double& t_lower_bound) const;
 };
 
 class Geometry 
@@ -21,6 +26,7 @@ class Geometry
 public:
     virtual ~Geometry() {};
     virtual bool intersect(const Ray& ray, GeometryHit& gHit) const = 0;
+    virtual bool updateIntersect(const Ray& ray, GeometryHit& gHit) const = 0;
     virtual Geometry* clone() const = 0;
 };
 
@@ -34,6 +40,8 @@ public:
 
     Vector C;
     double R;
+    BoundingBox bbox;
 
     bool intersect(const Ray& ray, GeometryHit& gHit) const;
+    bool updateIntersect(const Ray& ray, GeometryHit& gHit) const;
 };
