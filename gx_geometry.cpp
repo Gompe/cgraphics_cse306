@@ -1,6 +1,6 @@
 #include "gx_geometry.h"
 
-static inline double squareDouble(double& x) {return x*x;}
+static inline double squareDouble(double x) {return x*x;}
 
 Sphere::Sphere(const Vector& C, double R)
 : C(C), R(R)
@@ -57,7 +57,7 @@ bool Sphere::updateIntersect(const Ray& ray, GeometryHit& gHit) const {
     return true;
 }
 
-// ----- Bounding Box
+// ----- Bounding Box ----- //
 static inline bool hasSameSign(double a, double b)
 {   
     return (a<0)?(b<0):(b>0);
@@ -164,4 +164,50 @@ bool BoundingBox::intersect(const Ray& ray, double& t_lower_bound) const
 
     u *= t;
     return !(u[0] > xprime1 || u[1] > yprime1 || u[2] > zprime1);
+}
+
+// Transformations
+static inline Matrix rotationMatrix(const Vector& axis, double theta)
+{   
+    // https://en.wikipedia.org/wiki/Rotation_matrix
+    // Assumes axis is normalized
+    double sin_theta = sin(theta);
+    double cos_theta = cos(theta);
+
+    const Vector& u = axis;
+
+    double out[3][3] = {
+        {cos_theta+squareDouble(u[0])*(1-cos_theta), u[0]*u[1]*(1-cos_theta)-u[2]*sin_theta, u[0]*u[2]*(1-cos_theta)+u[1]*sin_theta},
+        {u[1]*u[0]*(1-cos_theta)+u[2]*sin_theta, cos_theta+squareDouble(u[1])*(1-cos_theta), u[1]*u[2]*(1-cos_theta)-u[0]*sin_theta},
+        {u[2]*u[0]*(1-cos_theta)-u[1]*sin_theta, u[2]*u[1]*(1-cos_theta)+u[0]*sin_theta, cos_theta+squareDouble(u[2])*(1-cos_theta)}
+    };
+
+    return Matrix(out);
+}
+
+static inline Matrix rotationMatrix(int axis, double theta)
+{
+    switch (axis) {
+        case 1: return rotationMatrix(Vector(1,0,0), theta);
+        case 2: return rotationMatrix(Vector(0,1,0), theta);
+        case 3: return rotationMatrix(Vector(0,0,1), theta);
+    }
+    throw std::logic_error("Axis must be 0, 1, 2 in rotationMatrix");
+}
+
+void Sphere::transformTranslate(const Vector& delta)
+{
+    C+=delta;
+}
+void Sphere::transformScale(double r){
+    R*=r;
+    C*=r;
+}
+void Sphere::transformRotate(const Vector& axis, double theta)
+{
+    C=rotationMatrix(axis, theta)*C;
+}
+void Sphere::transformRotate(int axis, double theta)
+{
+    C=rotationMatrix(axis, theta)*C;
 }

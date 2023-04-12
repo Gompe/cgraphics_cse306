@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <chrono>
+#include <atomic>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "./stb/stb_image_write.h"
@@ -265,12 +266,14 @@ int main() {
 		Material()
 	);
 
+	sphere_1.material.is_mirror = true;
+
 	Object sphere_2(
 		Sphere(Vector(-14, 7, 5), 3),
 		Material()
 	);
 
-	sphere_2.material.set_light(1E10);
+	sphere_2.material.set_light(1E7);
 
 	Object s3(
 		Sphere(Vector(+14, 7, +20), 7),
@@ -321,7 +324,7 @@ int main() {
 
 	double alpha = 60.*M_PI/180.;
 	// double I = 8E9;
-	double I = 4E9;
+	double I = 1E7;
 
 	Vector L(-10, 20, 50);
 	Scene scene(L, I);
@@ -343,17 +346,26 @@ int main() {
 	double focal_distance;
 	double radius_aperture;
 
-	std::cout << "Focal distance: ";
-	std::cin >> focal_distance;
-	//focal_distance = 80;
+	// std::cout << "Focal distance: ";
+	// std::cin >> focal_distance;
+	focal_distance = 40;
 
-	std::cout << "Aperture radius: ";
-	std::cin >> radius_aperture;
-	// radius_aperture = 1E-5;
+	// std::cout << "Aperture radius: ";
+	// std::cin >> radius_aperture;
+	radius_aperture = 5E-2;
 
 	ProjectiveCamera camera(camera_center, W, H, alpha, focal_distance, radius_aperture);
 
+	while(true){
 	std::vector<unsigned char> image(W * H * 3, 0);
+
+	double theta;
+	std::cout << "Theta: ";
+	std::cin >> theta;
+
+	scene.objects[3].geometry_ptr->transformTranslate(-camera_center);
+	scene.objects[3].geometry_ptr->transformRotate(2, theta);
+	scene.objects[3].geometry_ptr->transformTranslate(camera_center);
 
 	int NUMBER_OF_RAYS;
 	std::cout << "Number of rays:";
@@ -369,19 +381,30 @@ int main() {
 
 			for(int _counter=0; _counter<NUMBER_OF_RAYS; _counter++){
 				Ray r = camera.generate_ray(i, j);
-				color = color + scene.getColor(r, 5);
+
+				Vector vec = scene.getColor(r, 5);
+				// std::cout << vec << std::endl;
+				// std::cout << vec.clip(0., 255.) << std::endl;
+				color+= vec.clip(0., 255.);
 			}
 
 			color = color / NUMBER_OF_RAYS;
+			color = color.clip(0., 255.);
+			color /= 255.;
+			
+			color[0] = std::pow(color[0], 0.45);
+			color[1] = std::pow(color[1], 0.45);
+			color[2] = std::pow(color[2], 0.45);
 
+			color *= 255.;
 
 			image[(i * W + j) * 3 + 0] = std::min(color[0], 255.);
 			image[(i * W + j) * 3 + 1] = std::min(color[1], 255.);
 			image[(i * W + j) * 3 + 2] = std::min(color[2], 255.);
 
-			image[(i * W + j) * 3 + 0] = std::min(std::pow(color[0], 0.45), 255.);
-			image[(i * W + j) * 3 + 1] = std::min(std::pow(color[1], 0.45), 255.);
-			image[(i * W + j) * 3 + 2] = std::min(std::pow(color[2], 0.45), 255.);
+			// image[(i * W + j) * 3 + 0] = std::min(std::pow(color[0], 0.45), 255.);
+			// image[(i * W + j) * 3 + 1] = std::min(std::pow(color[1], 0.45), 255.);
+			// image[(i * W + j) * 3 + 2] = std::min(std::pow(color[2], 0.45), 255.);
 		}
 	}
 
@@ -390,6 +413,8 @@ int main() {
 	std::cout << "waited " << 1000*time_elapsed << std::endl;
 
 	stbi_write_png("image.png", W, H, 3, &image[0], 0);
+
+	}
 
 	return 0;
 }

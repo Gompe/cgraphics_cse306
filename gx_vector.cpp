@@ -137,7 +137,7 @@ Vector Vector::abs() const{
     );
 }
 Vector Vector::clip(double min_value, double max_value) const{
-    Vector output = *this;
+    Vector output(*this);
     for(int i=0; i<3; i++)
         output[i] = std::max(std::min(output[i], max_value), min_value);
     return output;

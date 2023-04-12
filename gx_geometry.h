@@ -28,6 +28,11 @@ public:
     virtual bool intersect(const Ray& ray, GeometryHit& gHit) const = 0;
     virtual bool updateIntersect(const Ray& ray, GeometryHit& gHit) const = 0;
     virtual Geometry* clone() const = 0;
+
+    virtual void transformTranslate(const Vector& delta) = 0;
+    virtual void transformScale(double r) = 0;
+    virtual void transformRotate(const Vector& axis, double theta) = 0;
+    virtual void transformRotate(int axis, double theta) = 0;
 };
 
 class Sphere : public Geometry
@@ -44,4 +49,9 @@ public:
 
     bool intersect(const Ray& ray, GeometryHit& gHit) const;
     bool updateIntersect(const Ray& ray, GeometryHit& gHit) const;
+
+    void transformTranslate(const Vector& delta);
+    void transformScale(double r);
+    void transformRotate(const Vector& axis, double theta);
+    void transformRotate(int axis, double theta);
 };
