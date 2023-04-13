@@ -19,13 +19,17 @@
 #include "gx_vector.h"
 #include "gx_random.h"
 #include "gx_camera.h"
-#include "gx_mesh.h"
 #include "gx_geometry.h"
 
 #include "gx_object.h"
 
-double sqr(double x) {
-	return x * x;
+
+template <typename T>
+static inline void print(const T& x, bool endLine=true) {
+    if (endLine)
+        std::cout << x << std::endl;
+    else
+        std::cout << x << " ";
 }
 
 static inline double squareDouble(double x) {return x*x; }
@@ -90,10 +94,6 @@ public:
 	{	
 		bool hasIntersection = false;
 		for (const auto& object : objects) {
-			// NOTE: Try to understand why (const auto object : objects) by value fails
-			// reason: pointer to object in hitInfo is meaningless...
-
-			// NOTE: hasIntersection = hasIntersection || object.updateIntersect(ray, hitInfo); WILL NOT WORK!!!
 			hasIntersection = object.updateIntersect(ray, hitInfo) || hasIntersection;
 		}
 		return hasIntersection;
@@ -105,7 +105,7 @@ public:
 		ObjectHit hitInfo;
 		Ray xray = Ray(P+EPSILON*N, (x-P).normalized());
 
-		if (!intersect(xray, hitInfo))
+		if (!updateIntersect(xray, hitInfo))
 			return true;
 		
 		return (x-P).norm2() <= squareDouble(hitInfo.tHit);
@@ -167,24 +167,25 @@ public:
 	}
 
 	Vector indirectLighting(const ObjectHit& hitInfo, int ray_depth){
-		if (ray_depth < 0) return Vector(0,0,0);
+		if (ray_depth <= 0) return Vector(0,0,0);
 
 		Ray random_ray = Ray(hitInfo.P + EPSILON*hitInfo.N, random_cos(hitInfo.N));
 		return hitInfo.object_ptr->material.albedo * getColor(random_ray, ray_depth-1, true);
 	}
 
 	Vector getColor(const Ray& ray, int ray_depth, bool last_bounce_diffuse=false){
-		if (ray_depth < 0) return Vector(0,0,0);
+		if (ray_depth <= 0) return Vector(0,0,0);
 
-		// CHANGE SO THAT INIT SETS TO DOUBLE MAX
 		ObjectHit hitInfo;
-		hitInfo.tHit = std::numeric_limits<double>::max();
+		if (!updateIntersect(ray, hitInfo))
+			return Vector(0.,0.,0.);
 
-		// if (!updateIntersect(ray, hitInfo))
+		// Debug
+		// if (isVisible(hitInfo.P, hitInfo.N, L)) {
+		// 	return Vector(255.,255.,255.) * (dot(ray.u, hitInfo.N) < 0 ? 1 : 0);
+		// }
+		// else
 		// 	return Vector(0.,0.,0.);
-
-		if (!intersect(ray, hitInfo))
-			return Vector();
 
 		// Hit happens
 		Vector& P = hitInfo.P;
@@ -307,12 +308,12 @@ int main() {
 
 	Object floor(
 		Sphere(Vector(0, -1000, 0), 1000),
-		Material((Vector(0.1, 0.1, 0.8)))
+		Material((Vector(1, 1, 1)))
 	);	
 
 	Object front_wall(
-		Sphere(Vector(0, 0, -1000), 940),
-		Material(Vector(0., 0.8, 0.4))
+		Sphere(Vector(0, 0, -1000), 910),
+		Material(Vector(0.1, 0.6, 0.7))
 	);
 
 	Object behind_wall(
@@ -324,16 +325,37 @@ int main() {
 
 	double alpha = 60.*M_PI/180.;
 	// double I = 8E9;
-	double I = 1E7;
+	double I = 4E7;
 
-	Vector L(-10, 20, 50);
+	// Vector L(-10, 20, 25);
+	Vector L(0, 0, 50);
 	Scene scene(L, I);
 
-	scene.insertObject(std::move(sphere_1));
-	scene.insertObject(std::move(sphere_2));
-	scene.insertObject(std::move(s3));
-	scene.insertObject(std::move(s4));
-	scene.insertObject(std::move(s5));
+	// scene.insertObject(std::move(sphere_1));
+	// scene.insertObject(std::move(sphere_2));
+	// scene.insertObject(std::move(s3));
+	// scene.insertObject(std::move(s4));
+	// scene.insertObject(std::move(s5));
+
+	Object mesh(
+		TriangleMesh("./data/cat/cat.obj"),
+		Material()
+	);
+
+	print("Before transforms");
+	mesh.geometry_ptr->transformScale(0.6);
+	mesh.geometry_ptr->transformTranslate(Vector(0,0,-25));
+	// mesh.material.is_mirror = true;
+	print("After transforms");
+
+	Object s(
+		Sphere(Vector(15, 4, 30), 4),
+		Material(Vector(0.3, 0.6, 0.7))
+	);
+
+	s.material.is_mirror = true;
+
+	scene.insertObject(std::move(s));
 
 	scene.insertObject(std::move(left_wall));
 	scene.insertObject(std::move(right_wall));
@@ -341,6 +363,11 @@ int main() {
 	scene.insertObject(std::move(floor));
 	scene.insertObject(std::move(front_wall));
 	scene.insertObject(std::move(behind_wall));
+
+	// Most complex object at the end of intersection loop...
+	print("Before Move mesh");
+	scene.insertObject(std::move(mesh));
+	print("After Move mesh");
 
 	// Input
 	double focal_distance;
@@ -354,27 +381,30 @@ int main() {
 	// std::cin >> radius_aperture;
 	radius_aperture = 5E-2;
 
-	ProjectiveCamera camera(camera_center, W, H, alpha, focal_distance, radius_aperture);
+	// ProjectiveCamera camera(camera_center, W, H, alpha, focal_distance, radius_aperture);
+	PinholeCamera camera(camera_center, W, H, alpha);
 
 	while(true){
 	std::vector<unsigned char> image(W * H * 3, 0);
 
-	double theta;
-	std::cout << "Theta: ";
-	std::cin >> theta;
+	// double theta;
+	// std::cout << "Theta: ";
+	// std::cin >> theta;
 
-	scene.objects[3].geometry_ptr->transformTranslate(-camera_center);
-	scene.objects[3].geometry_ptr->transformRotate(2, theta);
-	scene.objects[3].geometry_ptr->transformTranslate(camera_center);
+	// scene.objects[3].geometry_ptr->transformTranslate(-camera_center);
+	// scene.objects[3].geometry_ptr->transformRotate(2, theta);
+	// scene.objects[3].geometry_ptr->transformTranslate(camera_center);
 
 	int NUMBER_OF_RAYS;
 	std::cout << "Number of rays:";
 	std::cin >> NUMBER_OF_RAYS;
 
 	
+	const int N_BOUNCES = 3;
+
 	auto start = std::chrono::high_resolution_clock::now();
 
-	#pragma omp parallel for
+	// #pragma omp parallel for
 	for (int i = 0; i < H; i++) {
 		for (int j = 0; j < W; j++) {
 			Vector color = Vector(0,0,0);
@@ -382,10 +412,10 @@ int main() {
 			for(int _counter=0; _counter<NUMBER_OF_RAYS; _counter++){
 				Ray r = camera.generate_ray(i, j);
 
-				Vector vec = scene.getColor(r, 5);
+				Vector vec = scene.getColor(r, N_BOUNCES);
 				// std::cout << vec << std::endl;
 				// std::cout << vec.clip(0., 255.) << std::endl;
-				color+= vec.clip(0., 255.);
+				color+= vec; // .clip(0., 255.);
 			}
 
 			color = color / NUMBER_OF_RAYS;

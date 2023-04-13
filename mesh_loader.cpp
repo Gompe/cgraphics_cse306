@@ -1,4 +1,11 @@
-#include "gx_mesh.h"
+#include "gx_geometry.h"
+
+#include <algorithm>
+#include <iostream>
+#include <stdio.h>
+#include <string>
+#include <cstring>
+#include <vector>
 
 void TriangleMesh::readOBJ(const char *obj) {
   char matfile[255];
