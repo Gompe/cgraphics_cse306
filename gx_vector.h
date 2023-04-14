@@ -25,6 +25,9 @@ public:
     Vector& operator/=(double rhs);
     Vector& operator=(const Vector& rhs);
 
+    double min() const;
+    double max() const;
+
     double norm2() const;
     double norm() const;
     Vector normalized() const;
@@ -33,6 +36,14 @@ public:
     size_t argmin() const;
     size_t argmax() const;
     Vector orthogonal() const;
+
+    static Vector min(const Vector& a, const Vector& b);
+    static Vector max(const Vector& a, const Vector& b);
+
+    static Vector initOnesVector();
+    static Vector initMinVector();
+    static Vector initMaxVector();
+
 
 private:
     double coords[3];

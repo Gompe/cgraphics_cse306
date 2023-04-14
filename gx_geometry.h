@@ -1,23 +1,19 @@
 #pragma once
 #include "gx_vector.h"
-#include "binary_tree.h"
+#include "gx_material.h"
 
-class GeometryHit 
-{
-public:
-    Vector P;
-    Vector N;
-    double tHit = std::numeric_limits<double>::max();;
-};
+#include "binary_tree.h"
 
 class BoundingBox
 {
 public:
     BoundingBox() = default;
-    BoundingBox(double x0, double y0, double z0, double x1, double y1, double z1);
-    double x0, y0, z0;
-    double x1, y1, z1;
+	BoundingBox(const Vector& lbBbox, const Vector& ubBbox);
+    
+	// Lower bound and upper bound of Bounding Box
+	Vector lbBbox, ubBbox;
 
+	bool isInside(const Vector& v) const;
     bool intersect(const Ray& ray) const;
     bool intersect(const Ray& ray, double& t_lower_bound) const;
 
@@ -28,39 +24,58 @@ public:
 	static BoundingBox initWithLimits();
 };
 
-class Geometry 
+class ObjectHit;
+
+class Object 
 {
 public:
-    virtual ~Geometry() {};
-    virtual bool intersect(const Ray& ray, GeometryHit& gHit) const = 0;
-    virtual bool updateIntersect(const Ray& ray, GeometryHit& gHit) const = 0;
-    virtual Geometry* clone() const = 0;
+	Material material;
+
+    virtual ~Object() {};
+    virtual bool intersect(const Ray& ray, ObjectHit& gHit) const = 0;
+    virtual bool updateIntersect(const Ray& ray, ObjectHit& gHit) const = 0;
 
     virtual void transformTranslate(const Vector& delta) = 0;
     virtual void transformScale(double r) = 0;
     virtual void transformRotate(const Vector& axis, double theta) = 0;
     virtual void transformRotate(int axis, double theta) = 0;
+
+protected:
+	Object() {}
+	Object(Material m) : material(m) {}
 };
 
-class Sphere : public Geometry
+class ObjectHit 
+{
+public:
+    Vector P;
+    Vector N;
+    double tHit = std::numeric_limits<double>::max();
+	const Object *object_ptr = nullptr;
+	
+};
+
+class Sphere : public Object
 {
 public:
     Sphere(const Vector& C, double R);
-    ~Sphere() = default;
+	Sphere(const Vector& C, double R, const Material& material);
 
-    Geometry* clone() const;
+    ~Sphere() = default;
 
     Vector C;
     double R;
     BoundingBox bbox;
 
-    bool intersect(const Ray& ray, GeometryHit& gHit) const;
-	bool updateIntersect(const Ray& ray, GeometryHit& gHit) const;
+    bool intersect(const Ray& ray, ObjectHit& gHit) const;
+	bool updateIntersect(const Ray& ray, ObjectHit& gHit) const;
 
     void transformTranslate(const Vector& delta);
     void transformScale(double r);
     void transformRotate(const Vector& axis, double theta);
     void transformRotate(int axis, double theta);
+private:
+	void initBbox();
 };
 
 // ----- Triangle meshes ------
@@ -85,19 +100,21 @@ struct dataBVH {
 	BoundingBox bbox; // Bounding Box
 };
 
-class TriangleMesh : public Geometry{
+class TriangleMesh : public Object{
 public:
 	TriangleMesh() = delete;
 	TriangleMesh(const char *obj);
-	~TriangleMesh() = default;
+	TriangleMesh(const char *obj, const Material& material);
 
-	Geometry* clone() const;
+	~TriangleMesh() {std::cout << "Triangle Mesh Destructor" << std::endl;}
+
 
 	void readOBJ(const char *obj);
 
-	static const int BVH_STOP = 3;
+	static const int BVH_STOP = 5;
 
 	BoundingBox bbox;
+	binary_tree::BinaryTree<dataBVH> treeBVH;
 
 	std::vector<TriangleIndices> indices;
 	std::vector<Vector> vertices;
@@ -105,10 +122,10 @@ public:
 	std::vector<Vector> uvs;
 	std::vector<Vector> vertexcolors;
 
-	bool intersect(const Ray& ray, GeometryHit& gHit) const;
-	bool updateIntersect(const Ray& ray, GeometryHit& gHit) const;
+	bool intersect(const Ray& ray, ObjectHit& gHit) const;
+	bool updateIntersect(const Ray& ray, ObjectHit& gHit) const;
 
-	bool fastUpdateIntersect(const Ray& ray, GeometryHit& gHit) const;
+	bool fastUpdateIntersect(const Ray& ray, ObjectHit& gHit) const;
 
 	Vector triangleCentroid(int idx) const;
 
@@ -119,9 +136,12 @@ public:
 
 private:
 	// BVH Optimization
-	binary_tree::BinaryTree<dataBVH> treeBVH;
-	void buildBVH ();
-	binary_tree::Node<dataBVH> * buildBVH (int start, int end);
+	binary_tree::Node<dataBVH>* buildBVH (int start, int end);
 
-	bool BVHIntersectRoutine(const Ray& ray, GeometryHit& gHit, binary_tree::Node<dataBVH> *node) const;
+	void buildBVH ();
+	bool BVHIntersectRoutine(const Ray& ray, ObjectHit& gHit, const binary_tree::Node<dataBVH> *node) const;
+
+	void _verifyTree(binary_tree::Node<dataBVH>* node) const;
+	void transformBVH(std::function<void (BoundingBox&)> transform);
+
 };

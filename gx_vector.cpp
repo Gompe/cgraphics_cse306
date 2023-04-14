@@ -1,6 +1,15 @@
 #include "gx_vector.h"
 #include <iostream>
 
+static inline double min3(double a, double b, double c)
+{
+    return std::min(a, std::min(b,c));
+}
+
+static inline double max3(double a, double b, double c)
+{
+    return std::max(a, std::max(b,c));
+}
 
 /* Constructors */
 Vector::Vector(){
@@ -113,6 +122,17 @@ Vector cross(const Vector& a, const Vector& b) {
 }
 
 /* Utils */
+
+double Vector::min() const
+{
+    return min3(coords[0], coords[1], coords[2]);
+}
+
+double Vector::max() const
+{
+    return max3(coords[0], coords[1], coords[2]);
+}
+
 // Norm
 double Vector::norm2() const{
     return (
@@ -185,7 +205,34 @@ std::ostream& operator<<(std::ostream& os, const Vector& rhs){
     return os;
 }
 
-// ----- Ray Implementation 
+// static Vector Methods
+
+Vector Vector::min(const Vector& a, const Vector& b)
+{
+    return Vector(std::min(a[0], b[0]), std::min(a[1], b[1]), std::min(a[2], b[2]));
+}
+
+Vector Vector::max(const Vector& a, const Vector& b)
+{
+    return Vector(std::max(a[0], b[0]), std::max(a[1], b[1]), std::max(a[2], b[2]));
+}
+
+Vector Vector::initOnesVector()
+{
+    return Vector(1.,1.,1.);
+}
+
+Vector Vector::initMinVector()
+{
+    return Vector(std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest());
+}
+
+Vector Vector::initMaxVector()
+{
+    return Vector(std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
+}
+
+// ----- Ray Implementation -----
 Ray::Ray(const Vector& O, const Vector& u)
 : O(O), u(u)
 {}

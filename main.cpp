@@ -21,8 +21,6 @@
 #include "gx_camera.h"
 #include "gx_geometry.h"
 
-#include "gx_object.h"
-
 
 template <typename T>
 static inline void print(const T& x, bool endLine=true) {
@@ -63,7 +61,10 @@ public:
 	Vector L;
 	double I;
 
-	std::vector<Object> objects;
+	std::vector<const Object *> objects;
+	void insertObject(const Object* ptr) {
+		objects.push_back(ptr);
+	}
 
 	// Physics -- Maybe move to another file later
 	double schlick_reflexivity(const Vector& omega_i, const Vector &N, const double &n1, const double& n2){
@@ -75,26 +76,24 @@ public:
 
 	bool intersect(const Ray& ray, ObjectHit& hitInfo) const
 	{	
-		bool hasIntersection = false;
-		double first_hit_distance = std::numeric_limits<double>::max();
+		hitInfo = ObjectHit();
+
 		for(size_t i = 0; i < objects.size(); i++) {
 			ObjectHit possibleHit;
-			if (objects[i].intersect(ray, possibleHit)) {
-				if (possibleHit.tHit < first_hit_distance) {
-					first_hit_distance = possibleHit.tHit;
+			if (objects[i]->intersect(ray, possibleHit)) {
+				if (possibleHit.tHit < hitInfo.tHit) {
 					hitInfo = possibleHit;
-					hasIntersection = true;
 				}
 			}
 		}
-		return hasIntersection;
+		return (hitInfo.object_ptr != nullptr);
 	}
 
 	bool updateIntersect(const Ray& ray, ObjectHit& hitInfo) const
 	{	
 		bool hasIntersection = false;
-		for (const auto& object : objects) {
-			hasIntersection = object.updateIntersect(ray, hitInfo) || hasIntersection;
+		for (const Object *object_ptr : objects) {
+			hasIntersection = object_ptr->updateIntersect(ray, hitInfo) || hasIntersection;
 		}
 		return hasIntersection;
 	}
@@ -129,12 +128,13 @@ public:
 		return Lo;
 	}
 
-	Vector directLighting(const ObjectHit& hitInfo, const Sphere& lightSphere,
-							const Material& luminousMaterial) 
-	{
+	Vector sphereDirectLighting(const ObjectHit& hitInfo, const Sphere *object_ptr)
+	{	
+		const Material& luminousMaterial = object_ptr->material;
+
 		// Sample point on the light sphere
-		const Vector& C = lightSphere.C;
-		double R = lightSphere.R;
+		const Vector& C = object_ptr->C;
+		double R = object_ptr->R;
 
 		Vector D = (hitInfo.P - C).normalized();
 		Vector V = random_cos(D);
@@ -180,13 +180,6 @@ public:
 		if (!updateIntersect(ray, hitInfo))
 			return Vector(0.,0.,0.);
 
-		// Debug
-		// if (isVisible(hitInfo.P, hitInfo.N, L)) {
-		// 	return Vector(255.,255.,255.) * (dot(ray.u, hitInfo.N) < 0 ? 1 : 0);
-		// }
-		// else
-		// 	return Vector(0.,0.,0.);
-
 		// Hit happens
 		Vector& P = hitInfo.P;
 		Vector& N = hitInfo.N;
@@ -197,11 +190,8 @@ public:
 				return Vector(0.,0.,0.);
 			else {
 				double R2 = squareDouble(hitInfo.tHit);
-
-				// different from lecture notes. Maybe change later
-				Vector coloredLight = materialHit.albedo * materialHit.light_intensity;
-
-				return coloredLight / (4*M_PI*M_PI*R2);
+				Vector light = Vector::initOnesVector() * materialHit.light_intensity;
+				return light / (4*M_PI*M_PI*R2);
 			}
 		}
 
@@ -239,21 +229,12 @@ public:
 		Vector Lo_direct = directLighting(hitInfo);
 
 		// Check for direct lighting from spheres
-		for (size_t i=0; i<objects.size(); i++) {
-			if (dynamic_cast<Sphere*> (objects[i].geometry_ptr)) {
-				// objects[i].geometry is a sphere
-				const Material& luminousMaterial = objects[i].material;
-				if (luminousMaterial.is_light) 
-					Lo_direct += directLighting(hitInfo, 
-						*(dynamic_cast<Sphere*> (objects[i].geometry_ptr)), luminousMaterial);
-			}
+		for (auto object_ptr : objects) {
+			if (dynamic_cast<const Sphere *> (object_ptr) && object_ptr->material.is_light)
+				Lo_direct += sphereDirectLighting(hitInfo, dynamic_cast<const Sphere *> (object_ptr));
 		}
 
 		return Lo_direct + indirectLighting(hitInfo, ray_depth);
-	}
-
-	void insertObject(Object&& object) {
-		objects.push_back(std::move(object));
 	}
 
 };
@@ -262,149 +243,81 @@ int main() {
 	int W = 512;
 	int H = 512;
 
-	Object sphere_1(
-		Sphere(Vector(0, 7, 5), 7),
-		Material()
-	);
+	Object *sphere_1 = new Sphere(Vector(10, 7, 5), 7);
+	sphere_1->material.is_mirror = true;
 
-	sphere_1.material.is_mirror = true;
+	Object *sphere_2 = new Sphere(Vector(-15, 7, 5), 2.7);
+	sphere_2->material.set_light(1E7);
 
-	Object sphere_2(
-		Sphere(Vector(-14, 7, 5), 3),
-		Material()
-	);
+	Object *s3 = new Sphere(Vector(+14, 7, +20), 7, Material(Vector(0.8, 0.4, 0.8)));
 
-	sphere_2.material.set_light(1E7);
+	Object *s4 = new Sphere(Vector(-14, 5, +12), 5);
 
-	Object s3(
-		Sphere(Vector(+14, 7, +20), 7),
-		Material(Vector(0.8, 0.4, 0.8))
-	);
+	Object *s5 = new Sphere(Vector(+1, 0, +30), 1, Material(Vector(0.01, 0.05, 0.01)));
 
-	Object s4(
-		Sphere(Vector(-14, 5, +12), 5),
-		Material()
-	);
 
-	Object s5(
-		Sphere(Vector(+1, 0, +45), 1),
-		Material(Vector(0.5, 1., 0.5))
-	);
+	Object *left_wall = new Sphere(Vector(-1000, 0, 0), 940, Material(Vector(0.5, 0.8, 0.1)));
+	Object *right_wall = new Sphere(Vector(1000, 0, 0), 940, Material(Vector(0.9, 0.2, 0.3)));
+	Object *ceiling = new Sphere(Vector(0, 1000, 0), 940, Material(Vector(0.3, 0.5, 0.3)));
+	Object *floor = new Sphere(Vector(0, -1000, 0), 1000, Material((Vector(0.8, 0.8, 0.8))));
+	Object *front_wall = new Sphere(Vector(0, 0, -1000), 910, Material(Vector(0.1, 0.6, 0.7)));
+	Object *behind_wall = new Sphere(Vector(0, 0, 1000), 940, Material(Vector(0.8, 0.6, 0.8)));
 
-	Object left_wall(
-		Sphere(Vector(-1000, 0, 0), 940),
-		Material(Vector(0.5, 0.8, 0.1))
-	);
-
-	Object right_wall(
-		Sphere(Vector(1000, 0, 0), 940),
-		Material(Vector(0.9, 0.2, 0.3))
-	);
-
-	Object ceiling(
-		Sphere(Vector(0, 1000, 0), 940),
-		Material(Vector(0.3, 0.5, 0.3))
-	);
-
-	Object floor(
-		Sphere(Vector(0, -1000, 0), 1000),
-		Material((Vector(1, 1, 1)))
-	);	
-
-	Object front_wall(
-		Sphere(Vector(0, 0, -1000), 910),
-		Material(Vector(0.1, 0.6, 0.7))
-	);
-
-	Object behind_wall(
-		Sphere(Vector(0, 0, 1000), 940),
-		Material(Vector(1., 0.2, 0.1))
-	);
-
-	Vector camera_center(0, 0, 50);	
+	Vector camera_center(0, 10, 50);	
 
 	double alpha = 60.*M_PI/180.;
-	// double I = 8E9;
-	double I = 4E7;
+	double I = 4E6;
 
-	// Vector L(-10, 20, 25);
-	Vector L(0, 0, 50);
+	Vector L(0, 30, 20);
 	Scene scene(L, I);
 
-	// scene.insertObject(std::move(sphere_1));
-	// scene.insertObject(std::move(sphere_2));
-	// scene.insertObject(std::move(s3));
-	// scene.insertObject(std::move(s4));
-	// scene.insertObject(std::move(s5));
+	Object *mesh = new TriangleMesh("./data/cat/cat.obj", Material(Vector(0.2, 0.8, 0.8)));
 
-	Object mesh(
-		TriangleMesh("./data/cat/cat.obj"),
-		Material()
-	);
+	mesh->transformScale(0.8);
+	mesh->transformTranslate(Vector(0,0,-25));
+	mesh->transformRotate(2, -1.5);
+	mesh->transformTranslate(Vector(-30, 0, 0));
 
-	print("Before transforms");
-	mesh.geometry_ptr->transformScale(0.6);
-	mesh.geometry_ptr->transformTranslate(Vector(0,0,-25));
-	// mesh.material.is_mirror = true;
-	print("After transforms");
+	Object *mesh2 = new TriangleMesh("./data/cat/cat.obj", Material(Vector(0.1, 0.1, 0.1)));
 
-	Object s(
-		Sphere(Vector(15, 4, 30), 4),
-		Material(Vector(0.3, 0.6, 0.7))
-	);
+	mesh2->transformScale(0.8);
+	mesh2->transformTranslate(Vector(0,0,-25));
+	mesh2->transformRotate(2, -1.5);
+	mesh2->transformTranslate(Vector(-30, 0, 0));
+	mesh2->transformScale(0.2);
+	mesh2->transformTranslate(Vector(+5, 0, +20));
 
-	s.material.is_mirror = true;
+	scene.insertObject(sphere_1);
+	scene.insertObject(sphere_2);
+	scene.insertObject(s3);
+	scene.insertObject(s4);
+	scene.insertObject(s5);
 
-	scene.insertObject(std::move(s));
-
-	scene.insertObject(std::move(left_wall));
-	scene.insertObject(std::move(right_wall));
-	scene.insertObject(std::move(ceiling));
-	scene.insertObject(std::move(floor));
-	scene.insertObject(std::move(front_wall));
-	scene.insertObject(std::move(behind_wall));
+	scene.insertObject(left_wall);
+	scene.insertObject(right_wall);
+	scene.insertObject(ceiling);
+	scene.insertObject(floor);
+	scene.insertObject(front_wall);
+	scene.insertObject(behind_wall);
 
 	// Most complex object at the end of intersection loop...
-	print("Before Move mesh");
-	scene.insertObject(std::move(mesh));
-	print("After Move mesh");
+	scene.insertObject(mesh);
+	scene.insertObject(mesh2);
 
-	// Input
-	double focal_distance;
-	double radius_aperture;
-
-	// std::cout << "Focal distance: ";
-	// std::cin >> focal_distance;
-	focal_distance = 40;
-
-	// std::cout << "Aperture radius: ";
-	// std::cin >> radius_aperture;
-	radius_aperture = 5E-2;
-
-	// ProjectiveCamera camera(camera_center, W, H, alpha, focal_distance, radius_aperture);
 	PinholeCamera camera(camera_center, W, H, alpha);
 
 	while(true){
 	std::vector<unsigned char> image(W * H * 3, 0);
 
-	// double theta;
-	// std::cout << "Theta: ";
-	// std::cin >> theta;
-
-	// scene.objects[3].geometry_ptr->transformTranslate(-camera_center);
-	// scene.objects[3].geometry_ptr->transformRotate(2, theta);
-	// scene.objects[3].geometry_ptr->transformTranslate(camera_center);
-
 	int NUMBER_OF_RAYS;
 	std::cout << "Number of rays:";
 	std::cin >> NUMBER_OF_RAYS;
-
 	
-	const int N_BOUNCES = 3;
+	const int N_BOUNCES = 5;
 
 	auto start = std::chrono::high_resolution_clock::now();
 
-	// #pragma omp parallel for
+	#pragma omp parallel for
 	for (int i = 0; i < H; i++) {
 		for (int j = 0; j < W; j++) {
 			Vector color = Vector(0,0,0);
@@ -413,9 +326,7 @@ int main() {
 				Ray r = camera.generate_ray(i, j);
 
 				Vector vec = scene.getColor(r, N_BOUNCES);
-				// std::cout << vec << std::endl;
-				// std::cout << vec.clip(0., 255.) << std::endl;
-				color+= vec; // .clip(0., 255.);
+				color+= vec;
 			}
 
 			color = color / NUMBER_OF_RAYS;
@@ -431,10 +342,6 @@ int main() {
 			image[(i * W + j) * 3 + 0] = std::min(color[0], 255.);
 			image[(i * W + j) * 3 + 1] = std::min(color[1], 255.);
 			image[(i * W + j) * 3 + 2] = std::min(color[2], 255.);
-
-			// image[(i * W + j) * 3 + 0] = std::min(std::pow(color[0], 0.45), 255.);
-			// image[(i * W + j) * 3 + 1] = std::min(std::pow(color[1], 0.45), 255.);
-			// image[(i * W + j) * 3 + 2] = std::min(std::pow(color[2], 0.45), 255.);
 		}
 	}
 
