@@ -5,7 +5,7 @@ EXE=render
 ODIR=build
 
 SRCS = $(wildcard *.cpp)
-DEPS = $(wildcard *.h)
+DEPS = $(wildcard *.h) $(wildcard ./scenes/*.h)
 _OBJS = $(subst .cpp,.o,$(SRCS))
 OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
 

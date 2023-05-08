@@ -20,6 +20,13 @@ public:
     Ray ray_to_pixel_gaussian(int i, int j) const;
 };
 
+class AliasedCamera : public Camera
+{
+public:
+    AliasedCamera(const Vector& camera_center, int W, int H, double alpha);
+    Ray generate_ray(int i, int j) const;
+};
+
 class PinholeCamera : public Camera
 {
 public:

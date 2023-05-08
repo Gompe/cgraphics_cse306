@@ -2,6 +2,7 @@
 
 #include <iostream> 
 #include<assert.h>
+#include <functional>
 
 template <typename T>
 static inline void print(const T& x, bool endLine=true) {

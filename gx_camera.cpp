@@ -23,6 +23,14 @@ Ray Camera::ray_to_pixel_gaussian(int i, int j) const
     return Ray(camera_center, ray_dir.normalized());
 }
 
+AliasedCamera::AliasedCamera(const Vector& camera_center, int W, int H, double alpha)
+: Camera(camera_center, W, H, alpha) 
+{}
+
+Ray AliasedCamera::generate_ray(int i, int j) const
+{
+    return ray_to_pixel_center(i, j);
+}
 
 PinholeCamera::PinholeCamera(const Vector& camera_center, int W, int H, double alpha) 
 : Camera(camera_center, W, H, alpha) 

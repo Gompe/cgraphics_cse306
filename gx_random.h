@@ -3,7 +3,7 @@
 #include <random>
 
 #ifndef RANDOM_SEED
-#define RANDOM_SEED 10
+    #define RANDOM_SEED 10
 #endif
 
 double random_uniform();
