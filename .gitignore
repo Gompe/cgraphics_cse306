@@ -1,4 +1,5 @@
 render
 ./build
-./image.png
+image.png
+.vscode
 *.test.exe
