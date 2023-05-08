@@ -306,11 +306,10 @@ int main() {
 
 	PinholeCamera camera(camera_center, W, H, alpha);
 
-	while(true){
 	std::vector<unsigned char> image(W * H * 3, 0);
 
 	int NUMBER_OF_RAYS;
-	std::cout << "Number of rays:";
+	std::cout << "Select the desired number of rays per pixel:";
 	std::cin >> NUMBER_OF_RAYS;
 	
 	const int N_BOUNCES = 5;
@@ -350,8 +349,6 @@ int main() {
 	std::cout << "waited " << 1000*time_elapsed << std::endl;
 
 	stbi_write_png("image.png", W, H, 3, &image[0], 0);
-
-	}
 
 	return 0;
 }
